@@ -1,0 +1,16 @@
+# Secrets — NEVER commit
+.env
+
+# Virtual environment
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Editor / OS junk
+.vscode/
+.DS_Store
+
+# Generated PDF reports (the app creates these on the fly)
+*.pdf
