@@ -270,7 +270,7 @@ Open the printed URL (usually `http://localhost:8501`), then:
 
 ## Contributors
 
-- **<Subhashree Pattnaik>** — author and developer.
+- **Subhashree Pattnaik** — author and developer.
 
 ---
 
