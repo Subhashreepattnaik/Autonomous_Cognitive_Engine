@@ -276,4 +276,4 @@ Open the printed URL (usually `http://localhost:8501`), then:
 
 ## License
 
-No license file is currently included in this repository. To open-source it, add a `LICENSE` (the MIT License is a common choice for portfolio projects).
+This project is released under the [MIT License](LICENSE).
