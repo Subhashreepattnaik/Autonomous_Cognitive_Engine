@@ -1,19 +1,13 @@
 """Small shared helpers for the Autonomous Cognitive Engine."""
 
+import re
+
 
 def message_text(content) -> str:
     """Flatten a message's content into plain text.
 
-    Some models (e.g. Gemini) return a message's content as a plain string,
-    while others return a list of content blocks like
-    [{"type": "text", "text": "..."}]. This normalizes both to a string so
-    the rest of the app never has to care which shape it got.
-
-    Args:
-        content: The `.content` of a message (str or list of blocks).
-
-    Returns:
-        The text as a single string.
+    Some models return content as a plain string, others as a list of content
+    blocks like [{"type": "text", "text": "..."}]. This normalizes both.
     """
     if isinstance(content, str):
         return content
@@ -26,3 +20,8 @@ def message_text(content) -> str:
                 parts.append(str(block))
         return "".join(parts)
     return str(content)
+
+
+def clean_for_display(text: str) -> str:
+    """Turn raw <br> tags from the model into real Markdown line breaks."""
+    return re.sub(r"<br\s*/?>", "  \n", text)

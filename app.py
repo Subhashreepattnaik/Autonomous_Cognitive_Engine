@@ -16,7 +16,7 @@ from ui.components import (
     render_todo_board,
 )
 from ui.styles import load_css
-from utils.helpers import message_text
+from utils.helpers import clean_for_display, message_text
 
 st.set_page_config(
     page_title="Autonomous Cognitive Engine",
@@ -140,7 +140,7 @@ if result:
                 mime="application/pdf",
                 type="primary",
             )
-            st.markdown(message_text(result["final_report"]), unsafe_allow_html=True)
+            st.markdown(clean_for_display(message_text(result["final_report"])))
         else:
             st.info("No report was produced.")
 
