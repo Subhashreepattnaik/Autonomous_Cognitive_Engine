@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-06-18T14:53:29",
+  "model": "openai/gpt-oss-120b",
+  "n_queries": 3,
+  "summary": {},
+  "records": [
+    {
+      "query": "Research the main risks and benefits of solar energy",
+      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199402, Requested 10187. Please try again in 1h9m2.448s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+    },
+    {
+      "query": "Generate a research report on retrieval-augmented generation (RAG)",
+      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199584, Requested 1582. Please try again in 8m23.712s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+    },
+    {
+      "query": "Analyze the current state of electric vehicle adoption in 2026",
+      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199508, Requested 4120. Please try again in 26m7.296s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+    }
+  ]
+}

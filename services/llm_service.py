@@ -39,6 +39,8 @@ def get_llm(temperature: float | None = None, model: str | None = None):
         return ChatGroq(
             model=model or settings.GROQ_MODEL,
             temperature=temp,
+            max_tokens=4000,
+            reasoning_effort="low",
             max_retries=5,
             rate_limiter=_rate_limiter,
         )

@@ -8,7 +8,10 @@ def load_css() -> str:
       /* Hide Streamlit's default chrome for a cleaner app feel */
       #MainMenu, footer {visibility: hidden;}
 
-      .hero { text-align: center; padding: 2.5rem 1rem 1rem 1rem; }
+      .hero {
+        text-align: center;
+        padding: 2.5rem 1rem 1rem 1rem;
+      }
       .hero-badge {
         display: inline-block; padding: 0.3rem 0.9rem; border-radius: 999px;
         background: rgba(99, 102, 241, 0.12); color: #818cf8;
@@ -21,8 +24,15 @@ def load_css() -> str:
         background-clip: text;
       }
       .hero-subtitle {
-        font-size: 1.1rem; color: #94a3b8; max-width: 640px;
-        margin: 0.75rem auto 0 auto; line-height: 1.6;
+        font-size: 1.1rem !important;
+        color: #94a3b8 !important;
+        max-width: 620px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        margin-top: 0.75rem !important;
+        line-height: 1.6 !important;
+        text-align: center !important;
+        display: block !important;
       }
       .stButton button[kind="primary"] {
         font-size: 1.05rem; padding: 0.6rem 1rem; border-radius: 10px;

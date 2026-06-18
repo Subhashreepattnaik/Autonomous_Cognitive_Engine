@@ -90,3 +90,32 @@ def render_stats(result: dict) -> None:
     c1.metric("Tasks completed", f"{done}/{len(todos)}" if todos else "0")
     c2.metric("Files saved", len(files))
     c3.metric("Report length", f"{len(result.get('final_report', ''))} chars")
+
+def render_quality_badge(result: dict) -> None:
+    """Show a colored 'Quality Score: X/10' badge for the report."""
+    score = result.get("score", 0)
+    grade = result.get("grade", "N/A")
+    reason = result.get("reason", "")
+
+    # Color by score band.
+    if score >= 8:
+        color, bg = "#22c55e", "rgba(34,197,94,0.12)"
+    elif score >= 6:
+        color, bg = "#eab308", "rgba(234,179,8,0.12)"
+    else:
+        color, bg = "#ef4444", "rgba(239,68,68,0.12)"
+
+    st.markdown(
+        f"""
+        <div style="display:inline-flex; align-items:center; gap:0.5rem;
+                    padding:0.5rem 1rem; border-radius:999px; background:{bg};
+                    border:1px solid {color};">
+          <span style="font-weight:700; color:{color};">
+            ✅ Quality Score: {score}/10 — {grade}
+          </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if reason:
+        st.caption(reason)

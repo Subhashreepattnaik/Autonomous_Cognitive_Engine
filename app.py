@@ -12,9 +12,11 @@ from ui.components import (
     render_current_task,
     render_memory,
     render_progress,
+    render_quality_badge,
     render_stats,
     render_todo_board,
 )
+from evaluation.evaluators import score_report_for_display
 from ui.styles import load_css
 from utils.helpers import clean_for_display, message_text
 
@@ -100,6 +102,17 @@ if start and query.strip():
             render_todo_board(todos, live=True)
 
     dashboard.empty()  # clear the live view; settled view shows below
+
+    # Judge the report quality (one extra LLM call) for the badge.
+    if final_state and final_state.get("final_report"):
+        with st.spinner("Scoring report quality…"):
+            try:
+                final_state["quality"] = score_report_for_display(
+                    final_state["final_report"]
+                )
+            except Exception:
+                final_state["quality"] = None
+
     st.session_state.result = final_state
 
 elif start:
@@ -127,8 +140,10 @@ if result:
 
     with report_tab:
         if result.get("final_report"):
-            from services.pdf_service import generate_report_pdf
+            if result.get("quality"):
+                render_quality_badge(result["quality"])
 
+            from services.pdf_service import generate_report_pdf
             pdf_bytes = generate_report_pdf(
                 query=message_text(result["messages"][0].content),
                 report=message_text(result["final_report"]),
@@ -143,7 +158,6 @@ if result:
             st.markdown(clean_for_display(message_text(result["final_report"])))
         else:
             st.info("No report was produced.")
-
     with memory_tab:
         render_memory(result.get("virtual_files", {}))
 

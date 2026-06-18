@@ -122,12 +122,25 @@ def synthesize_node(state: AgentState) -> dict:
     """Write the final report from all gathered research notes."""
     query = _user_query(state)
     notes = state.get("research_notes", "")
+
+    # Cap notes so the prompt stays lean and leaves room for a full response.
+    if len(notes) > 4000:
+        notes = notes[:4000] + "\n\n[Notes truncated for length.]"
+
+    # Higher output ceiling so the report can finish its Conclusion.
     llm = get_llm()
 
     prompt = (
-        "Write a final research report using ONLY the research notes below. "
-        "Answer the request with these sections: Overview, Key Findings, "
-        "Analysis, Conclusion. Preserve any source URLs from the notes.\n\n"
+        "Write a COMPLETE research report using ONLY the notes below.\n\n"
+        "Rules:\n"
+        "- Include exactly these four sections, in order: Overview, Key "
+        "Findings, Analysis, Conclusion.\n"
+        "- Keep Overview and Analysis brief (2-3 short paragraphs each) so you "
+        "have room to FINISH the Conclusion. Reaching a complete Conclusion is "
+        "more important than length in earlier sections.\n"
+        "- End with a 'Conclusion' section of 2-4 sentences that synthesizes "
+        "the findings. Do NOT stop before the Conclusion is fully written.\n"
+        "- Preserve key source URLs from the notes.\n\n"
         f"Request: {query}\n\nResearch notes:\n{notes}"
     )
     report = message_text(llm.invoke(prompt).content)

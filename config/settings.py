@@ -34,8 +34,9 @@ LLM_PROVIDER: str = "groq"
 
 # Groq model — strong at the tool-calling our agents need. 1,000 requests/day
 # free. Alternative with more daily token budget: "openai/gpt-oss-120b".
-GROQ_MODEL: str = "openai/gpt-oss-120b"
+#GROQ_MODEL: str = "openai/gpt-oss-120b"
 
+GROQ_MODEL: str = "openai/gpt-oss-20b"
 # Gemini model (kept for easy switch-back if you get a paid key later).
 GEMINI_MODEL: str = "gemini-3.5-flash"
 
