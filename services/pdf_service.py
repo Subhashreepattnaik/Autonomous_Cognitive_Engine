@@ -130,3 +130,35 @@ def generate_report_pdf(query: str, report: str) -> bytes:
         onLaterPages=_add_page_number,
     )
     return buffer.getvalue()
+
+def _clean(text: str) -> str:
+    """Make a line safe and displayable for ReportLab's paragraph parser."""
+    # Normalize fancy Unicode punctuation to plain ASCII the base font supports.
+    replacements = {
+        "\u2011": "-",   # non-breaking hyphen
+        "\u2013": "-",   # en dash
+        "\u2014": "-",   # em dash
+        "\u2018": "'",   # left single quote
+        "\u2019": "'",   # right single quote
+        "\u201c": '"',   # left double quote
+        "\u201d": '"',   # right double quote
+        "\u2026": "...", # ellipsis
+        "\u00a0": " ",   # non-breaking space
+        "\u2022": "-",   # bullet
+        "\u2248": "~",   # almost-equal
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+
+    # Normalize <br> variants to a space.
+    text = re.sub(r"<br\s*/?>", " ", text)
+    # Remove any other stray HTML tags.
+    text = re.sub(r"</?[a-zA-Z][^>]*>", "", text)
+    # Escape & so ReportLab doesn't treat it as an entity start.
+    text = text.replace("&", "&amp;")
+    # Drop Markdown bold/italic markers the base font won't render.
+    text = text.replace("**", "").replace("__", "").replace("*", "")
+
+    # Drop any remaining non-ASCII characters that the base font can't show.
+    text = text.encode("ascii", "ignore").decode("ascii")
+    return text
