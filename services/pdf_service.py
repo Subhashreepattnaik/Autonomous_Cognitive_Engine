@@ -29,6 +29,17 @@ def _add_page_number(canvas, doc) -> None:
         canvas.setFillGray(0.5)
         canvas.drawCentredString(A4[0] / 2, 1.2 * cm, f"Page {page - 1}")
 
+def _clean(text: str) -> str:
+    """Make a line safe for ReportLab's mini-HTML paragraph parser."""
+    # Normalize all <br> variants to a space.
+    text = re.sub(r"<br\s*/?>", " ", text)
+    # Remove any other stray HTML/Markdown-table tags.
+    text = re.sub(r"</?[a-zA-Z][^>]*>", "", text)
+    # Escape & so ReportLab doesn't treat it as an entity start.
+    text = text.replace("&", "&amp;")
+    # Strip Markdown bold/italic markers ReportLab won't render anyway.
+    text = text.replace("**", "").replace("__", "")
+    return text
 
 def _markdown_to_flowables(report: str, styles) -> list:
     """Convert the report's light Markdown into ReportLab paragraphs."""
@@ -41,16 +52,17 @@ def _markdown_to_flowables(report: str, styles) -> list:
 
         # Headings: ## Heading  or  ### Heading
         if line.startswith("### "):
-            flowables.append(Paragraph(line[4:], styles["Heading3"]))
+            flowables.append(Paragraph(_clean(line[4:]), styles["Heading3"]))
         elif line.startswith("## "):
-            flowables.append(Paragraph(line[3:], styles["Heading2"]))
+            flowables.append(Paragraph(_clean(line[3:]), styles["Heading2"]))
         elif line.startswith("# "):
-            flowables.append(Paragraph(line[2:], styles["Heading1"]))
+            flowables.append(Paragraph(_clean(line[2:]), styles["Heading1"]))
         else:
-            # Bullets -> a dash; turn bare URLs into clickable links.
-            text = re.sub(r"^[-*]\s+", "• ", line)
+            text = re.sub(r"^[-*]\s+", "• ", line)  # bullets -> dot
+            text = _clean(text)
+            # Turn bare URLs into clickable links (after cleaning).
             text = re.sub(
-                r"(https?://[^\s)]+)",
+                r"(https?://[^\s)<]+)",
                 r'<a href="\1" color="blue">\1</a>',
                 text,
             )
