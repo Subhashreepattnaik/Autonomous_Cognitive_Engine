@@ -140,7 +140,7 @@ if result:
                 mime="application/pdf",
                 type="primary",
             )
-            st.markdown(message_text(result["final_report"]))
+            st.markdown(message_text(result["final_report"]), unsafe_allow_html=True)
         else:
             st.info("No report was produced.")
 
