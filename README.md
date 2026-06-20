@@ -1,6 +1,6 @@
 # 🧠 Autonomous Cognitive Engine
 
-> A LangGraph-powered autonomous research agent that plans, searches the live web, manages its own memory, delegates to a specialist sub-agent, scores its own output, and writes a sourced report — end to end, on free APIs.
+> A LangGraph-powered autonomous research agent that plans, searches the live web, manages its own memory, delegates to a specialist sub-agent, scores its own output, and writes a sourced report — end to end, on free APIs, with automatic model failover.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.x-orange)
@@ -31,15 +31,16 @@ Give it a request like *"Research the main risks and benefits of solar energy"* 
 - **Task planning** — `plan_node` decomposes a request into 3–5 sub-tasks tracked as a to-do list (`pending` / `running` / `completed`).
 - **Virtual file system & context offloading** — `ls`, `read_file`, `write_file`, `edit_file` tools read/write a `virtual_files` dictionary in state; research findings are saved as `findings_*.md` instead of accumulating in context.
 - **Multi-agent design** — specialist agents built with LangChain's `create_agent` (research, search, summarization); the graph delegates findings-condensing to the summarization agent each research step.
-- **Live web search** — Tavily integration returns clean, agent-ready results.
+- **Live web search** — Tavily integration returns clean, agent-ready results (5 results per query).
 - **Stateful LangGraph workflow** — a `StateGraph` over a shared `AgentState`, with a conditional edge that loops research until every task is done.
-- **Research report generation** — `synthesize_node` writes a structured report (Overview, Key Findings, Analysis, Conclusion) with preserved source URLs.
+- **Section-by-section report synthesis** — `synthesize_node` composes the final report one section at a time (Overview, Key Findings, Analysis, Conclusion), so each section gets a full output budget and the report never truncates before its conclusion.
 - **Live quality scoring** — an LLM-as-a-judge scores each finished report 0–10 and shows a colored **Quality Score** badge in the UI.
+- **Automatic model failover** — every model call routes through a single access point that automatically fails over `gpt-oss-120b → gpt-oss-20b → llama-3.3-70b-versatile` on a rate-limit (429) error, so a single exhausted quota doesn't stop a run.
 - **PDF export** — `pdf_service` builds a downloadable PDF with a cover page, styled headings, **real rendered tables**, clickable links, and page numbers (ReportLab, generated in memory).
 - **Polished Streamlit UI** — gradient hero, example prompts, live execution dashboard (progress bar, current-task banner, color-coded task board), tabbed results (Report / Memory / Plan), run metrics, quality badge, PDF download, and reset.
 - **Automated evaluation suite** — an offline harness that scores the engine against four milestone metrics, including an LLM-as-a-judge for report quality (see [Evaluation](#evaluation)).
 - **LangSmith tracing** — every run is automatically traced for full step-by-step observability.
-- **Rate limiting & model failover** — a shared `InMemoryRateLimiter` paces all requests, and the LLM model is a single config value, so switching models (e.g. to a fresh free-tier quota bucket) is a one-line change.
+- **Shared rate limiting** — a single `InMemoryRateLimiter` paces all requests to stay within free-tier limits.
 
 ---
 
@@ -55,8 +56,8 @@ graph TD
     subgraph engine["Engine — runtime"]
       Graph --> Plan["plan_node"]
       Plan --> Research["research_node (loops per task)"]
-      Research --> Synth["synthesize_node"]
-      Research --> Tavily["web_search (Tavily)"]
+      Research --> Synth["synthesize_node (section-by-section)"]
+      Research --> Tavily["web_search (Tavily, 5 results)"]
       Research --> Summ["Summarization Agent"]
     end
 
@@ -66,7 +67,7 @@ graph TD
     State --> UI
     UI --> PDF["PDF Export"]
 
-    Plan --> LLM["get_llm()<br/>Groq gpt-oss-120b (rate-limited)"]
+    Plan --> LLM["get_llm() / invoke_llm()<br/>Groq + auto-failover (rate-limited)"]
     Research --> LLM
     Synth --> LLM
     Summ --> LLM
@@ -93,7 +94,7 @@ flowchart TD
     B --> C{Pending task?}
     C -- yes --> D["research_node — search, summarize, offload to files"]
     D --> C
-    C -- no --> E["synthesize_node — write final report"]
+    C -- no --> E["synthesize_node — write report section-by-section"]
     E --> F["Quality judge scores the report (0-10)"]
     F --> G["Render report + quality badge + PDF download"]
 ```
@@ -114,7 +115,7 @@ flowchart TD
     G --> H["results.json + printed summary"]
 ```
 
-**Runtime, step by step:** the request enters the graph; `plan_node` decomposes it into `pending` sub-tasks; `research_node` takes each pending task, runs a Tavily search (in code), delegates condensing to the summarization agent, saves findings to `virtual_files` and `research_notes`, and marks it `completed`; a conditional edge loops until none remain; `synthesize_node` writes `final_report`; a quality judge scores it; the UI renders the report, badge, and PDF download.
+**Runtime, step by step:** the request enters the graph; `plan_node` decomposes it into `pending` sub-tasks; `research_node` takes each pending task, runs a Tavily search (in code), delegates condensing to the summarization agent, saves findings to `virtual_files` and `research_notes`, and marks it `completed`; a conditional edge loops until none remain; `synthesize_node` writes `final_report` one section at a time; a quality judge scores it; the UI renders the report, badge, and PDF download.
 
 ---
 
@@ -136,7 +137,7 @@ Autonomous_Cognitive_Engine/
 ├── tools/
 │   ├── planning_tools.py        # write_todos
 │   ├── file_system_tools.py     # ls, read_file, write_file, edit_file
-│   └── search_tools.py          # web_search (Tavily)
+│   └── search_tools.py          # web_search (Tavily, 5 results)
 ├── agents/
 │   ├── research_agent.py        # build_research_agent (search + file tools)
 │   ├── search_agent.py          # build_search_agent (search only)
@@ -145,7 +146,7 @@ Autonomous_Cognitive_Engine/
 │   ├── nodes.py                 # plan_node, research_node, synthesize_node
 │   └── build_graph.py           # build_graph(), conditional research loop
 ├── services/
-│   ├── llm_service.py           # get_llm() — provider-aware, rate-limited
+│   ├── llm_service.py           # get_llm(), invoke_llm(), call_with_failover()
 │   └── pdf_service.py           # generate_report_pdf() — tables, cover, links
 ├── ui/
 │   ├── styles.py                # load_css()
@@ -170,7 +171,7 @@ Autonomous_Cognitive_Engine/
 | Orchestration         | LangGraph (>= 1.0) — `StateGraph`                    |
 | Agent framework       | LangChain (>= 1.0) — `create_agent`, tools           |
 | LLM provider (main)   | Groq — `openai/gpt-oss-120b`                         |
-| LLM provider (fallback)| Groq — `openai/gpt-oss-20b` *(temporary)*           |
+| LLM failover chain    | `gpt-oss-120b` → `gpt-oss-20b` → `llama-3.3-70b-versatile` |
 | LLM provider (alt)    | Google Gemini (`langchain-google-genai` >= 4.0)      |
 | Web search            | Tavily (`langchain-tavily`)                          |
 | Observability         | LangSmith                                            |
@@ -179,9 +180,9 @@ Autonomous_Cognitive_Engine/
 | PDF generation        | ReportLab                                            |
 | Config / secrets      | python-dotenv                                        |
 
-### Model strategy
+### Model strategy & automatic failover
 
-The default model is **`openai/gpt-oss-120b`** — on Groq's free tier it has the best quality and the largest daily token budget (~200K tokens/day), giving the most research runs per day. Because Groq tracks limits **separately per model**, **`openai/gpt-oss-20b`** is used as a **temporary same-day fallback**: if the 120B daily quota is exhausted, switching `GROQ_MODEL` in `config/settings.py` to the 20B gives a fresh quota bucket with no other code changes. The 20B is smaller, so reports are slightly less detailed — it is a continuity fallback, not the preferred default.
+The default model is **`openai/gpt-oss-120b`** — on Groq's free tier it has the best quality and the largest daily token budget (~200K tokens/day). Because Groq tracks limits **separately per model**, all model access flows through a single chokepoint (`get_llm()` / `invoke_llm()`) that implements **automatic failover**: when a call hits a rate-limit (429) or daily-quota error, the engine transparently advances to the next model in the chain — `gpt-oss-120b → gpt-oss-20b → llama-3.3-70b-versatile` — and continues the run instead of failing. The fallback models each draw on a separate quota bucket, so an exhausted main model no longer stops a run. `gpt-oss-120b` remains the committed default; failover is runtime resilience underneath it.
 
 ---
 
@@ -213,7 +214,7 @@ Configured in `.env` (loaded by `config/settings.py` via python-dotenv). See `.e
 
 | Variable             | Required | Purpose                                                   |
 |----------------------|----------|-----------------------------------------------------------|
-| `GROQ_API_KEY`       | Yes*     | Groq LLM access (main + fallback models)                  |
+| `GROQ_API_KEY`       | Yes*     | Groq LLM access (all models in the failover chain)        |
 | `TAVILY_API_KEY`     | Yes      | Tavily web search                                         |
 | `GOOGLE_API_KEY`     | Optional | Google Gemini (only if `LLM_PROVIDER` is set to `gemini`) |
 | `LANGSMITH_TRACING`  | Optional | Set to `true` to enable tracing                           |
@@ -240,7 +241,7 @@ Open the printed URL (usually `http://localhost:8501`), then:
 4. Read the report under the **Report** tab (with its **Quality Score** badge), inspect saved notes under **Memory**, review the **Plan**.
 5. Click **Download PDF** to save the report.
 
-> **Free-tier note:** the LLM and search providers are rate-limited per minute and per day. A shared rate limiter paces requests automatically. If the main model's daily quota is reached, switch `GROQ_MODEL` to the fallback (`openai/gpt-oss-20b`) for a fresh bucket — a one-line change.
+> **Free-tier note:** the LLM and search providers are rate-limited per minute and per day. A shared rate limiter paces requests automatically, and if a model's quota is exhausted mid-run, the engine fails over to the next model in the chain (`120b → 20b → 70b`) without manual intervention.
 
 ---
 
@@ -261,27 +262,27 @@ python -m evaluation.run_eval
 | M1 | Task Decomposition Accuracy | ≥ 80% | **100%** ✅ |
 | M2 | Context Offloading (file system usage) | ≥ 80% | **100%** ✅ |
 | M3 | Delegation & Result Integration | ≥ 80% | **100%** ✅ |
-| M4 | Report Quality (LLM-as-a-judge) | ≥ 70% | 0–33% ⚠️ |
+| M4 | Report Quality (LLM-as-a-judge) | ≥ 70% | 0–67% (across runs) ⚠️ |
 
-*(Measured on a 3-query dataset. The same judge, run per-report in the app, has scored individual reports as high as 8.0/10 "Good".)*
+*(Measured on a 3-query dataset using the free `openai/gpt-oss-120b` model on Groq. Individual reports score "Good" (6–8/10) in the live app.)*
 
 ### Analysis
 
 The core architecture passes every structural milestone at 100% — planning, context offloading, and delegation all work reliably across queries.
 
-**M4 (report quality) is a deliberately surfaced limitation, not a hidden bug.** The evaluation suite caught that final reports occasionally **truncate before the Conclusion**, which the judge consistently penalized. Root cause: the free reasoning-capable model spends part of its output-token budget on internal reasoning, leaving insufficient room to finish long, notes-heavy reports. Mitigations applied (capping synthesis input, raising `max_tokens`, and setting `reasoning_effort="low"`) improved results — single reports now routinely score 7–8/10 in the live app — but the dataset average did not fully clear the 70% bar on the free tier.
+**M4 (report quality) tells a build → measure → fix story.** The evaluation suite first caught that final reports **truncated before the Conclusion** (scoring 0–33%), which was root-caused to the reasoning model spending its output-token budget on internal reasoning. This was fixed by **section-by-section synthesis** — composing each report section in its own call so none truncates — which eliminated the truncation and roughly doubled M4 (to ~67% at its best). The remaining gap reflects strict LLM-based quality judging on a small 3-query dataset running on free-tier models, where reports are complete and cited but limited in source depth. The score varies run-to-run because three samples near the judge's pass/fail boundary is inherently noisy.
 
-This is a representative real-world constraint of building a token-hungry multi-agent system on free APIs (~200K tokens/day). The remaining gap is addressable with a larger model or section-by-section synthesis — documented transparently rather than masked by an easier test set.
+This is a representative real-world constraint of building a token-hungry multi-agent system on free APIs (~200K tokens/day) — documented transparently rather than masked by an easier test set.
 
 ---
 
 ## Future Improvements
 
-- **Section-by-section synthesis** to fully eliminate report truncation on free models.
-- **Automatic provider/model failover** when a rate limit is hit.
 - **Persistent semantic memory** — back the virtual file system with a vector store (e.g. ChromaDB) for recall across runs.
+- **Deeper / primary-source research** — gather more and higher-quality sources per task to improve report depth.
 - **Human-in-the-loop planning** — let the user approve or edit the plan before research begins.
 - **Parallel research** of independent sub-tasks with token-budget awareness.
+- **Larger evaluation dataset** — expand beyond 3 queries to stabilise the M4 metric.
 
 ---
 
