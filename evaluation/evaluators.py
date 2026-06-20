@@ -1,20 +1,15 @@
 """
 Milestone evaluators.
-
 Each evaluator inspects a finished run's state and returns:
     {"metric": str, "passed": bool, "score": ..., "reason": str}
-
 Milestones 1-3 are deterministic structural checks (no extra LLM calls — they
 verify the mechanism fired, the same evidence a LangSmith trace shows).
 Milestone 4 uses an LLM-as-a-judge to grade report quality.
 """
-
 import json
 import re
-
-from services.llm_service import get_llm
+from services.llm_service import get_llm, invoke_llm
 from utils.helpers import message_text
-
 
 def evaluate_planning(state: dict) -> dict:
     """Milestone 1 — Task Decomposition Accuracy."""
@@ -29,7 +24,6 @@ def evaluate_planning(state: dict) -> dict:
         "reason": f"{count} sub-tasks; substantive={substantive}",
     }
 
-
 def evaluate_offloading(state: dict) -> dict:
     """Milestone 2 — Correct File System / Context Offloading Usage."""
     files = state.get("virtual_files", {})
@@ -43,7 +37,6 @@ def evaluate_offloading(state: dict) -> dict:
         "score": len(files),
         "reason": f"{len(files)} files saved for {completed} completed tasks",
     }
-
 
 def evaluate_delegation(state: dict) -> dict:
     """Milestone 3 — Successful Delegation & Result Integration.
@@ -63,7 +56,6 @@ def evaluate_delegation(state: dict) -> dict:
         "reason": f"notes={len(notes)} chars; all_completed={all_done}",
     }
 
-
 def evaluate_report_quality(state: dict) -> dict:
     """Milestone 4 — Output Quality via LLM-as-a-judge."""
     report = message_text(state.get("final_report", ""))
@@ -75,7 +67,6 @@ def evaluate_report_quality(state: dict) -> dict:
             "reason": "No report produced.",
         }
 
-    judge = get_llm(temperature=0.0)
     prompt = (
         "You are a strict evaluator of research reports. Rate the report below "
         "from 1 to 5, considering: completeness, clear structure/sections, "
@@ -85,7 +76,7 @@ def evaluate_report_quality(state: dict) -> dict:
         '"justification": "<one sentence>"}\n\n'
         f"REPORT:\n{report[:4000]}"
     )
-    raw = message_text(judge.invoke(prompt).content)
+    raw = message_text(invoke_llm(prompt, temperature=0).content)
 
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     try:
@@ -105,7 +96,6 @@ def evaluate_report_quality(state: dict) -> dict:
         "reason": data.get("justification", "Could not parse judge response."),
     }
 
-
 ALL_EVALUATORS = [
     evaluate_planning,
     evaluate_offloading,
@@ -113,17 +103,14 @@ ALL_EVALUATORS = [
     evaluate_report_quality,
 ]
 
-
 def score_report_for_display(report: str) -> dict:
     """Judge a single report for the UI. Returns {score:0-10, grade, reason}.
-
     One LLM call. Used to show a 'Quality Score' badge after a research run.
     """
     report = message_text(report)
     if not report.strip():
         return {"score": 0, "grade": "no report", "reason": "Empty report."}
 
-    judge = get_llm(temperature=0.0)
     prompt = (
         "You are a strict evaluator of research reports. Rate the report below "
         "from 0 to 10, considering completeness, clear structure, whether "
@@ -133,8 +120,7 @@ def score_report_for_display(report: str) -> dict:
         '"reason": "<one short sentence>"}\n\n'
         f"REPORT:\n{report[:4000]}"
     )
-    raw = message_text(judge.invoke(prompt).content)
-
+    raw = message_text(invoke_llm(prompt, temperature=0).content)
     import json
     import re
     match = re.search(r"\{.*\}", raw, re.DOTALL)

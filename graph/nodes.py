@@ -9,6 +9,9 @@ before they're written or report before it researches.
 Web search runs here in CODE, not via an LLM tool call, so the model never has
 to format a tool call (the source of the malformed-call errors we saw).
 
+All model calls route through invoke_llm / call_with_failover, which auto-switch
+120B -> 20B -> 70B on a 429 / quota error.
+
 Flow: plan_node -> research_node (looped once per task) -> synthesize_node
 """
 
@@ -17,7 +20,7 @@ import re
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agents.summarization_agent import build_summarization_agent
-from services.llm_service import get_llm
+from services.llm_service import invoke_llm, call_with_failover
 from state.agent_state import AgentState, Todo
 from tools.search_tools import web_search
 from utils.helpers import message_text
@@ -34,7 +37,6 @@ def _user_query(state: AgentState) -> str:
 def plan_node(state: AgentState) -> dict:
     """Break the user's request into a list of research sub-tasks."""
     query = _user_query(state)
-    llm = get_llm()
 
     prompt = (
         "Break the following research request into 3 to 5 clear, focused "
@@ -42,7 +44,8 @@ def plan_node(state: AgentState) -> dict:
         "no extra text.\n\n"
         f"Request: {query}"
     )
-    raw_lines = message_text(llm.invoke(prompt).content).splitlines()
+    resp = invoke_llm(prompt)                      # <- failover-aware call
+    raw_lines = message_text(resp.content).splitlines()
 
     tasks: list[str] = []
     for line in raw_lines:
@@ -89,13 +92,14 @@ def research_node(state: AgentState) -> dict:
         sources = f"Web search failed: {exc}"
 
     # 2) Delegate condensing to the summarization specialist (no tools = reliable).
-    summarizer = build_summarization_agent()
+    #    Wrapped in call_with_failover so a 429 switches model and retries.
     summary_input = (
         f"Summarize the findings for this research task: '{task}'. "
         f"Keep the key facts and the source URLs.\n\nFindings:\n{sources}"
     )
-    out = summarizer.invoke(
-        {"messages": [{"role": "user", "content": summary_input}]}
+    out = call_with_failover(
+        build_summarization_agent,
+        {"messages": [{"role": "user", "content": summary_input}]},
     )
     findings = message_text(out["messages"][-1].content)
 
@@ -119,33 +123,56 @@ def research_node(state: AgentState) -> dict:
 
 
 def synthesize_node(state: AgentState) -> dict:
-    """Write the final report from all gathered research notes."""
+    """Build the final report section-by-section so it never truncates."""
     query = _user_query(state)
     notes = state.get("research_notes", "")
 
-    # Cap notes so the prompt stays lean and leaves room for a full response.
-    if len(notes) > 4000:
-        notes = notes[:4000] + "\n\n[Notes truncated for length.]"
+    # Cap notes to keep each call within the model's input budget.
+    # (If failover drops to 20B and you hit a 413, lower 7000 to 4000.)
+    if len(notes) > 7000:
+        notes = notes[:7000] + "\n\n[Notes truncated for length.]"
 
-    # Higher output ceiling so the report can finish its Conclusion.
-    llm = get_llm()
+    # Each section is its own call -> full output budget per section.
+    sections = [
+        ("Overview",
+         "Write ONLY the 'Overview' section (2-3 sentences) introducing the "
+         "topic and what this report covers. Do not write other sections."),
+        ("Key Findings",
+         "Write ONLY the 'Key Findings' section as 4-6 concise bullet points. "
+         "Each bullet MUST cite a specific source from the notes — include the "
+         "source name or URL in parentheses at the end of the bullet. Do not "
+         "use vague phrases like 'studies show'; name the source. Do not write "
+         "other sections."),
+        ("Analysis",
+         "Write ONLY the 'Analysis' section as 3-4 substantial paragraphs. Go "
+         "beyond restating the findings: compare and contrast the evidence, "
+         "explain causes and trade-offs, note any tensions or limitations in "
+         "the sources, and discuss practical implications. Cite specific "
+         "sources where relevant. Do not write other sections."),
+        ("Conclusion",
+         "Write ONLY the 'Conclusion' section (2-3 sentences) summarising the "
+         "answer and key takeaways. Do not write other sections."),
+    ]
 
-    prompt = (
-        "Write a COMPLETE research report using ONLY the notes below.\n\n"
-        "Rules:\n"
-        "- Include exactly these four sections, in order: Overview, Key "
-        "Findings, Analysis, Conclusion.\n"
-        "- Keep Overview and Analysis brief (2-3 short paragraphs each) so you "
-        "have room to FINISH the Conclusion. Reaching a complete Conclusion is "
-        "more important than length in earlier sections.\n"
-        "- End with a 'Conclusion' section of 2-4 sentences that synthesizes "
-        "the findings. Do NOT stop before the Conclusion is fully written.\n"
-        "- Preserve key source URLs from the notes.\n\n"
-        f"Request: {query}\n\nResearch notes:\n{notes}"
-    )
-    report = message_text(llm.invoke(prompt).content)
+    parts = []
+    for title, instruction in sections:
+        prompt = (
+            f"You are writing a research report on: {query}\n\n"
+            f"Here are the research notes:\n{notes}\n\n"
+            f"{instruction}\n"
+            f"Do not repeat the section heading; write only the body text."
+        )
+        try:
+            resp = invoke_llm(prompt, temperature=0)   # <- failover-aware call
+            body = resp.content if hasattr(resp, "content") else str(resp)
+            body = body.strip()
+        except Exception as e:
+            body = f"(Section unavailable: {e})"
+        parts.append(f"## {title}\n\n{body}")
+
+    final_report = f"# Research Report: {query}\n\n" + "\n\n".join(parts)
 
     return {
-        "final_report": report,
-        "messages": [AIMessage(content=report)],
+        "final_report": final_report,
+        "messages": [AIMessage(content="Final report synthesized.")],
     }

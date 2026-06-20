@@ -1,14 +1,12 @@
 """
 Evaluation runner — runs the engine on each test query, scores it against the
 four milestone metrics, prints an aggregate report, and saves results to JSON.
-
 Run from the project root:
     python -m evaluation.run_eval
 """
 
 import json
 from datetime import datetime
-
 from config import settings
 from evaluation.dataset import TEST_QUERIES
 from evaluation.evaluators import ALL_EVALUATORS
@@ -21,7 +19,6 @@ THRESHOLDS = {
     "M3 Delegation & Integration": 0.80,
     "M4 Report Quality": 0.70,
 }
-
 
 def run() -> None:
     settings.validate_settings()

@@ -25,6 +25,6 @@ if not settings.TAVILY_API_KEY:
 #                but more tokens and Tavily credits per call).
 #   topic="general": standard web search (Tavily also offers "news", "finance").
 web_search = TavilySearch(
-    max_results=3,
+    max_results=5,
     topic="general",
 )

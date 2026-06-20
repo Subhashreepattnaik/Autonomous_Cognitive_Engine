@@ -1,16 +1,12 @@
 """
 Supervisor agent — plans the work, delegates sub-tasks to specialist agents,
 and synthesizes the final report.
-
 The `task` tool is the delegation mechanism: calling it runs an entire
 specialist agent and returns its result to the Supervisor.
 """
-
 from typing import Literal
-
 from langchain.agents import AgentState as BaseAgentState, create_agent
 from langchain.tools import tool
-
 from agents.research_agent import build_research_agent
 from agents.search_agent import build_search_agent
 from agents.summarization_agent import build_summarization_agent
@@ -23,14 +19,11 @@ from utils.helpers import message_text
 # The specialists the Supervisor is allowed to delegate to.
 AgentName = Literal["research_agent", "search_agent", "summarization_agent"]
 
-
 class SupervisorState(BaseAgentState):
     """Supervisor's state: the base agent state plus our plan and file system,
     so `write_todos` and the file tools have channels to write to."""
-
     todos: list[Todo]
     virtual_files: dict[str, str]
-
 
 SUPERVISOR_SYSTEM_PROMPT = """You are the Supervisor of an autonomous research \
 team. You coordinate specialist agents to produce a thorough, well-sourced \

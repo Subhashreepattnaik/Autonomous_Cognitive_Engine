@@ -1,20 +1,120 @@
 {
-  "timestamp": "2026-06-18T14:53:29",
+  "timestamp": "2026-06-19T21:03:52",
   "model": "openai/gpt-oss-120b",
   "n_queries": 3,
-  "summary": {},
+  "summary": {
+    "M1 Task Planning": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M2 Context Offloading": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M3 Delegation & Integration": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M4 Report Quality": {
+      "pass_rate": 0.0,
+      "threshold": 0.7,
+      "status": "BELOW TARGET",
+      "n": 3
+    }
+  },
   "records": [
     {
       "query": "Research the main risks and benefits of solar energy",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199402, Requested 10187. Please try again in 1h9m2.448s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 5,
+          "reason": "5 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 5,
+          "reason": "5 files saved for 5 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 12670,
+          "reason": "notes=12670 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": false,
+          "score": 3,
+          "reason": "The report has clear sections and cites sources, but lacks depth, comprehensive coverage, and full coherence."
+        }
+      }
     },
     {
       "query": "Generate a research report on retrieval-augmented generation (RAG)",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199584, Requested 1582. Please try again in 8m23.712s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 5,
+          "reason": "5 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 5,
+          "reason": "5 files saved for 5 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 12953,
+          "reason": "notes=12953 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": false,
+          "score": 3,
+          "reason": "The report has clear sections and cites sources, but it is incomplete and lacks depth in analysis and conclusion."
+        }
+      }
     },
     {
       "query": "Analyze the current state of electric vehicle adoption in 2026",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `openai/gpt-oss-120b` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 199508, Requested 4120. Please try again in 26m7.296s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 5,
+          "reason": "5 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 5,
+          "reason": "5 files saved for 5 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 10243,
+          "reason": "notes=10243 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": false,
+          "score": 3,
+          "reason": "The report has clear sections and cites sources, but lacks depth, comprehensive data, and full coherence in analysis."
+        }
+      }
     }
   ]
 }
