@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-19T21:03:52",
+  "timestamp": "2026-06-21T13:19:19",
   "model": "openai/gpt-oss-120b",
   "n_queries": 3,
   "summary": {
@@ -22,7 +22,7 @@
       "n": 3
     },
     "M4 Report Quality": {
-      "pass_rate": 0.0,
+      "pass_rate": 0.6666666666666666,
       "threshold": 0.7,
       "status": "BELOW TARGET",
       "n": 3
@@ -47,14 +47,14 @@
         "M3 Delegation & Integration": {
           "metric": "M3 Delegation & Integration",
           "passed": true,
-          "score": 12670,
-          "reason": "notes=12670 chars; all_completed=True"
+          "score": 19646,
+          "reason": "notes=19646 chars; all_completed=True"
         },
         "M4 Report Quality": {
           "metric": "M4 Report Quality",
-          "passed": false,
-          "score": 3,
-          "reason": "The report has clear sections and cites sources, but lacks depth, comprehensive coverage, and full coherence."
+          "passed": true,
+          "score": 4,
+          "reason": "The report is well\u2011structured with clear sections and multiple citations, but it ends abruptly and lacks a full conclusion, limiting completeness."
         }
       }
     },
@@ -76,14 +76,14 @@
         "M3 Delegation & Integration": {
           "metric": "M3 Delegation & Integration",
           "passed": true,
-          "score": 12953,
-          "reason": "notes=12953 chars; all_completed=True"
+          "score": 21305,
+          "reason": "notes=21305 chars; all_completed=True"
         },
         "M4 Report Quality": {
           "metric": "M4 Report Quality",
-          "passed": false,
-          "score": 3,
-          "reason": "The report has clear sections and cites sources, but it is incomplete and lacks depth in analysis and conclusion."
+          "passed": true,
+          "score": 4,
+          "reason": "The report is well-structured, covers key topics, and cites sources, but lacks formal in-text citations and deeper critical analysis."
         }
       }
     },
@@ -105,14 +105,14 @@
         "M3 Delegation & Integration": {
           "metric": "M3 Delegation & Integration",
           "passed": true,
-          "score": 10243,
-          "reason": "notes=10243 chars; all_completed=True"
+          "score": 16590,
+          "reason": "notes=16590 chars; all_completed=True"
         },
         "M4 Report Quality": {
           "metric": "M4 Report Quality",
           "passed": false,
           "score": 3,
-          "reason": "The report has clear sections and cites sources, but lacks depth, comprehensive data, and full coherence in analysis."
+          "reason": "The report covers key points and cites sources, but lacks a clear conclusion, full structure, and consistent citation formatting."
         }
       }
     }

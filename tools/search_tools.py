@@ -24,7 +24,4 @@ if not settings.TAVILY_API_KEY:
 #   max_results: how many sources to return per search (more = richer context,
 #                but more tokens and Tavily credits per call).
 #   topic="general": standard web search (Tavily also offers "news", "finance").
-web_search = TavilySearch(
-    max_results=5,
-    topic="general",
-)
+web_search = TavilySearch(max_results=5, search_depth="advanced", include_raw_content=True)
