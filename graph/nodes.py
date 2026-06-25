@@ -37,6 +37,7 @@ def _user_query(state: AgentState) -> str:
 def plan_node(state: AgentState) -> dict:
     """Break the user's request into a list of research sub-tasks."""
     query = _user_query(state)
+    print(f"\n[PLAN] Planning research for: {query}")
 
     prompt = (
         "Break the following research request into 3 to 5 clear, focused "
@@ -44,7 +45,7 @@ def plan_node(state: AgentState) -> dict:
         "no extra text.\n\n"
         f"Request: {query}"
     )
-    resp = invoke_llm(prompt)                      # <- failover-aware call
+    resp = invoke_llm(prompt)                      # failover-aware call
     raw_lines = message_text(resp.content).splitlines()
 
     tasks: list[str] = []
@@ -57,6 +58,10 @@ def plan_node(state: AgentState) -> dict:
 
     todos: list[Todo] = [{"content": t, "status": "pending"} for t in tasks]
     plan_text = "Plan:\n" + "\n".join(f"  - {t}" for t in tasks)
+
+    print(f"[PLAN] Created {len(tasks)} sub-tasks:")
+    for i, t in enumerate(tasks, 1):
+        print(f"       {i}. {t}")
 
     return {
         "todos": todos,
@@ -79,6 +84,7 @@ def research_node(state: AgentState) -> dict:
 
     task = todos[index]["content"]
     todos[index]["status"] = "running"
+    print(f"\n[RESEARCH] Task {index + 1}: {task}")
 
     # 1) Search the web in CODE — deterministic, no LLM tool-call to mangle.
     try:
@@ -88,11 +94,14 @@ def research_node(state: AgentState) -> dict:
             f"Source: {r.get('url', '')}\n{r.get('content', '')}"
             for r in results
         ) or "No results found."
+        print(f"[SEARCH] Tavily returned {len(results)} results")
     except Exception as exc:
         sources = f"Web search failed: {exc}"
+        print(f"[SEARCH] Web search failed: {exc}")
 
     # 2) Delegate condensing to the summarization specialist (no tools = reliable).
     #    Wrapped in call_with_failover so a 429 switches model and retries.
+    print("[DELEGATE] Handing findings to the summarization sub-agent...")
     summary_input = (
         f"Summarize the findings for this research task: '{task}'. "
         f"Keep the key facts and the source URLs.\n\nFindings:\n{sources}"
@@ -102,15 +111,18 @@ def research_node(state: AgentState) -> dict:
         {"messages": [{"role": "user", "content": summary_input}]},
     )
     findings = message_text(out["messages"][-1].content)
+    print(f"[DELEGATE] Sub-agent returned a {len(findings)}-char summary")
 
     # 3) Offload findings to the virtual file system and the running notes.
     files = dict(state.get("virtual_files", {}))
     files[f"findings_{index + 1}.md"] = f"# {task}\n\n{findings}"
     notes = f"{state.get('research_notes', '')}\n\n## {task}\n{findings}".strip()
+    print(f"[VFS] Saved findings_{index + 1}.md  (virtual files now: {len(files)})")
 
     # 4) Mark the task completed.
     todos[index]["status"] = "completed"
     completed = list(state.get("completed_tasks", [])) + [task]
+    print(f"[RESEARCH] Completed task {index + 1} of {len(todos)}")
 
     return {
         "todos": todos,
@@ -126,6 +138,7 @@ def synthesize_node(state: AgentState) -> dict:
     """Build the final report section-by-section so it never truncates."""
     query = _user_query(state)
     notes = state.get("research_notes", "")
+    print(f"\n[SYNTHESIZE] Building report from {len(notes)} chars of notes...")
 
     # Cap notes to keep each call within the model's input budget.
     # (If failover drops to 20B and you hit a 413, lower 7000 to 4000.)
@@ -163,14 +176,16 @@ def synthesize_node(state: AgentState) -> dict:
             f"Do not repeat the section heading; write only the body text."
         )
         try:
-            resp = invoke_llm(prompt, temperature=0)   # <- failover-aware call
+            resp = invoke_llm(prompt, temperature=0)   # failover-aware call
             body = resp.content if hasattr(resp, "content") else str(resp)
             body = body.strip()
         except Exception as e:
             body = f"(Section unavailable: {e})"
+        print(f"[SYNTHESIZE] Wrote '{title}' section ({len(body)} chars)")
         parts.append(f"## {title}\n\n{body}")
 
     final_report = f"# Research Report: {query}\n\n" + "\n\n".join(parts)
+    print(f"[SYNTHESIZE] Final report complete ({len(final_report)} chars)\n")
 
     return {
         "final_report": final_report,

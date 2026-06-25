@@ -68,13 +68,21 @@ def evaluate_report_quality(state: dict) -> dict:
         }
 
     prompt = (
-        "You are a strict evaluator of research reports. Rate the report below "
-        "from 1 to 5, considering: completeness, clear structure/sections, "
-        "whether sources are cited, and overall coherence.\n\n"
-        "Respond with ONLY a JSON object, no other text, exactly like:\n"
+        "You are evaluating a research report produced by an automated web-research "
+        "agent (not a human or an academic paper). Judge it ONLY on what such a "
+        "report should achieve. Rate it 1 to 5 on:\n"
+        "  1. Structure: clear sections (Overview, Key Findings, Analysis, Conclusion).\n"
+        "  2. Sourcing: refers to / cites where information came from.\n"
+        "  3. Coherence: reads clearly and stays on topic.\n"
+        "  4. Completeness: covers the question and is not cut off.\n\n"
+        "Do NOT require academic methodology, literature-review rigour, or formal "
+        "citation styles — those are out of scope for a web-research summary. A report "
+        "that is well-structured, sourced, coherent, and complete is 'good' (4). "
+        "Reserve 'excellent' (5) for that PLUS strong analytical depth.\n\n"
+        "Respond with ONLY a JSON object, no other text:\n"
         '{"score": <1-5 integer>, "grade": "poor|fair|good|excellent", '
         '"justification": "<one sentence>"}\n\n'
-        f"REPORT:\n{report[:4000]}"
+        f"REPORT:\n{report[:8000]}"
     )
     raw = message_text(invoke_llm(prompt, temperature=0).content)
 
@@ -87,7 +95,7 @@ def evaluate_report_quality(state: dict) -> dict:
     score = data.get("score", 0)
     grade = str(data.get("grade", "")).lower()
     passed = grade in {"good", "excellent"} or (
-        isinstance(score, int) and score >= 4
+        isinstance(score, (int, float)) and score >= 4
     )
     return {
         "metric": "M4 Report Quality",
@@ -118,7 +126,7 @@ def score_report_for_display(report: str) -> dict:
         "Respond with ONLY a JSON object, no other text:\n"
         '{"score": <0-10 number>, "grade": "<Poor|Fair|Good|Excellent>", '
         '"reason": "<one short sentence>"}\n\n'
-        f"REPORT:\n{report[:4000]}"
+        f"REPORT:\n{report[:8000]}"
     )
     raw = message_text(invoke_llm(prompt, temperature=0).content)
     import json

@@ -24,6 +24,7 @@ def write_todos(tasks: list[str], runtime: ToolRuntime) -> Command:
     Args:
         tasks: Short descriptions of the sub-tasks, in the order to do them.
     """
+    
     todos: list[Todo] = [{"content": t, "status": "pending"} for t in tasks]
 
     summary = "\n".join(f"  [pending] {t}" for t in tasks)
