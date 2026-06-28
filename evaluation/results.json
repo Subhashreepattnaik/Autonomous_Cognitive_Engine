@@ -1,20 +1,120 @@
 {
-  "timestamp": "2026-06-25T02:56:14",
+  "timestamp": "2026-06-25T20:18:32",
   "model": "openai/gpt-oss-120b",
   "n_queries": 3,
-  "summary": {},
+  "summary": {
+    "M1 Task Planning": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M2 Context Offloading": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M3 Delegation & Integration": {
+      "pass_rate": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "n": 3
+    },
+    "M4 Report Quality": {
+      "pass_rate": 1.0,
+      "threshold": 0.7,
+      "status": "PASS",
+      "n": 3
+    }
+  },
   "records": [
     {
       "query": "Research the main risks and benefits of solar energy",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98436, Requested 6029. Please try again in 1h4m17.76s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 5,
+          "reason": "5 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 5,
+          "reason": "5 files saved for 5 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 15768,
+          "reason": "notes=15768 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": true,
+          "score": 4,
+          "reason": "The report is well\u2011structured, cites sources, stays on topic, and fully addresses the risks and benefits of solar energy without being cut off."
+        }
+      }
     },
     {
       "query": "Generate a research report on retrieval-augmented generation (RAG)",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98688, Requested 2727. Please try again in 20m22.56s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 4,
+          "reason": "4 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 4,
+          "reason": "4 files saved for 4 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 12238,
+          "reason": "notes=12238 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": true,
+          "score": 4,
+          "reason": "The report is well\u2011structured, cites sources, stays coherent, and fully addresses the topic, meeting the criteria for a good web\u2011research summary."
+        }
+      }
     },
     {
       "query": "Analyze the current state of electric vehicle adoption in 2026",
-      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01ksx9d9fyfsysm14pqg6ar54a` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98686, Requested 4085. Please try again in 39m54.144s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "metrics": {
+        "M1 Task Planning": {
+          "metric": "M1 Task Planning",
+          "passed": true,
+          "score": 5,
+          "reason": "5 sub-tasks; substantive=True"
+        },
+        "M2 Context Offloading": {
+          "metric": "M2 Context Offloading",
+          "passed": true,
+          "score": 5,
+          "reason": "5 files saved for 5 completed tasks"
+        },
+        "M3 Delegation & Integration": {
+          "metric": "M3 Delegation & Integration",
+          "passed": true,
+          "score": 14372,
+          "reason": "notes=14372 chars; all_completed=True"
+        },
+        "M4 Report Quality": {
+          "metric": "M4 Report Quality",
+          "passed": true,
+          "score": 4,
+          "reason": "The report is well\u2011structured, cites sources, stays coherent, and fully addresses the 2026 EV adoption question without being cut off."
+        }
+      }
     }
   ]
 }
