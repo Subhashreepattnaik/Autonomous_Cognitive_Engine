@@ -11,7 +11,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-ff4b4b)](https://autonomouscognitiveengine-eq3jtf5aa7qtqr6brsbwz.streamlit.app)
 
-**🔗 Live demo:** [https://autonomouscognitiveengine-eq3jtf5aa7qtqr6brsbwz.streamlit.app](https://autonomouscognitiveengine-eq3jtf5aa7qtqr6brsbwz.streamlit.app)
+**🔗 Live demo:** [https://autonomouscognitiveengine-eq2jtf5aa7qtqe9brs6rwz.streamlit.app/](https://autonomouscognitiveengine-eq2jtf5aa7qtqe9brs6rwz.streamlit.app/)
 
 ---
 
