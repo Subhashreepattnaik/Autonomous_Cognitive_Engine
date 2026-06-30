@@ -1,27 +1,32 @@
 """
 LLM service: single access point for all model calls, with automatic
-rate limiting and 429 failover (120B -> 20B -> 70B).
+rate limiting and failover (Gemini -> gpt-oss-120b -> llama-3.3-70b).
+
+Every model call in the project goes through get_llm() / invoke_llm(), so the
+shared rate limiter and automatic model failover apply everywhere from one place.
 """
 
+import os
 from langchain_core.rate_limiters import InMemoryRateLimiter
 
 from config import settings
 
 # --- Shared rate limiter (paces every request to respect free-tier limits) ---
+# Gemini's free tier allows more throughput than Groq, so 2 req/s is safe and
+# much faster than the old 0.5. Lower this if you start seeing rate-limit errors.
 _rate_limiter = InMemoryRateLimiter(
-    requests_per_second=0.5,     # ~1 request every 2s; adjust if needed
+    requests_per_second=2,
     check_every_n_seconds=0.1,
-    max_bucket_size=1,
+    max_bucket_size=3,
 )
 
-# --- Model failover chain: tried in order when a 429 / quota error occurs ---
+# --- Failover chain: (provider, model_name). Tried in order on a 429/quota error.
+#     Gemini is the main model; Groq models are fallbacks. gpt-oss-20b removed. ---
 _MODELS = [
-    settings.GROQ_MODEL,            # main (openai/gpt-oss-120b from settings)
-    "openai/gpt-oss-20b",          # fallback 1: separate fresh quota bucket
-    "llama-3.3-70b-versatile",     # fallback 2: last resort
+    ("groq",   "llama-3.3-70b-versatile"),  # main — fast, strong writing, no thinking
+    ("google", "gemini-2.0-flash"),         # fallback 1 — fast, generous limits
+    ("groq",   "openai/gpt-oss-120b"),      # fallback 2 — capable, last resort
 ]
-# de-duplicate while preserving order (in case GROQ_MODEL already appears)
-_MODELS = list(dict.fromkeys(_MODELS))
 _active_idx = 0
 
 
@@ -32,7 +37,6 @@ def _resolve_temp(temperature):
 def _build_groq(model_name: str, temperature):
     """Construct a ChatGroq model. reasoning_effort only on gpt-oss models."""
     from langchain_groq import ChatGroq
-
     kwargs = dict(
         model=model_name,
         temperature=temperature,
@@ -43,6 +47,37 @@ def _build_groq(model_name: str, temperature):
     if model_name.startswith("openai/gpt-oss"):
         kwargs["reasoning_effort"] = "low"
     return ChatGroq(**kwargs)
+
+
+def _build_gemini(model_name: str, temperature):
+    """Construct a Gemini model. Disable 'thinking' for speed (gemini-2.5-flash
+    is a reasoning model; we don't need internal thinking for these tasks)."""
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    base = dict(
+        model=model_name,
+        temperature=temperature,
+        max_output_tokens=4000,
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        rate_limiter=_rate_limiter,
+    )
+    # Try to disable thinking for speed. Library versions differ on how this is
+    # passed, so fall back gracefully if the argument isn't supported.
+    try:
+        return ChatGoogleGenerativeAI(**base, thinking_budget=0)
+    except TypeError:
+        try:
+            return ChatGoogleGenerativeAI(
+                **base, model_kwargs={"thinking_config": {"thinking_budget": 0}}
+            )
+        except TypeError:
+            return ChatGoogleGenerativeAI(**base)  # no thinking control available
+
+
+def _build(provider: str, model_name: str, temperature):
+    if provider == "google":
+        return _build_gemini(model_name, temperature)
+    return _build_groq(model_name, temperature)
 
 
 def _is_rate_limit(exc) -> bool:
@@ -56,20 +91,24 @@ def _is_rate_limit(exc) -> bool:
             "too many requests",
             "tokens per day",
             "quota",
+            "resource_exhausted",   # Gemini's quota error wording
+            "resource exhausted",
         )
     )
 
 
 def get_llm(temperature=None):
-    """Return the currently active model (advances automatically on 429)."""
-    return _build_groq(_MODELS[_active_idx], _resolve_temp(temperature))
+    """Return the currently active model (advances automatically on a 429)."""
+    provider, model_name = _MODELS[_active_idx]
+    print(f"[MODEL] {provider}/{model_name}")   # shows which model each call uses
+    return _build(provider, model_name, _resolve_temp(temperature))
 
 
 def call_with_failover(make_runnable, payload):
     """
-    Invoke a freshly-built runnable; on a 429, advance to the next model and
-    retry. `make_runnable` is a zero-arg function that builds the runnable
-    using get_llm() so it picks up the (possibly advanced) current model.
+    Invoke a freshly-built runnable; on a 429 / quota error, advance to the next
+    model and retry. `make_runnable` is a zero-arg function that builds the
+    runnable via get_llm() so it picks up the (possibly advanced) current model.
     """
     global _active_idx
     while True:
@@ -81,7 +120,7 @@ def call_with_failover(make_runnable, payload):
                 _active_idx += 1
                 print(
                     f"[failover] rate limit hit -> switching to "
-                    f"{_MODELS[_active_idx]}"
+                    f"{_MODELS[_active_idx][1]}"
                 )
                 continue
             raise

@@ -145,7 +145,7 @@ EXAMPLE_PROMPTS = [
 st.markdown(
     """
     <div class="hero">
-      <div class="hero-logo">◆</div>
+     <div class="hero-logo">◆</div>
       <div class="hero-badge">Powered by LangGraph</div>
       <h1 class="hero-title">Autonomous Cognitive Engine</h1>
       <p class="hero-subtitle">
@@ -156,6 +156,19 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+with st.expander("ℹ️  New here? What this app does & how it works", expanded=False):
+    st.markdown("""
+**Autonomous Cognitive Engine (ACE)** turns one research question into a complete, sourced report — automatically.
+
+**How it works**
+1. **Plan** — it breaks your question into 3–5 focused sub-tasks.
+2. **Delegate** — a *supervisor agent* sends each task to the specialist it needs: **Research** (live web search), **Summarization**, **Analysis**, or **Coding**.
+3. **Remember** — findings are saved to a **Virtual File System** so nothing is lost between steps.
+4. **Synthesize** — it writes a structured, sourced report and scores its own quality (0–10).
+
+**Try it:** type a question below (or pick an example) and click **Start Research**. Open the **Memory** tab afterward to see what each agent saved.
+    """)
 
 # ---- Input section ----
 st.markdown("#### Try an example, or write your own")

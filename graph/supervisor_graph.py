@@ -1,22 +1,15 @@
 """
 graph/supervisor_graph.py  —  the SUPERVISOR (ReAct) multi-agent architecture.
 
-This matches the project specification:
-  * a SUPERVISOR agent that reasons about the work and decides what to do next
-    (a ReAct loop: Reason -> choose an agent -> Act -> Observe -> repeat),
-  * which DELEGATES each sub-task to a specialised sub-agent
-    (Research, Summarization, Analysis, Coding),
-  * all wired together as a stateful LangGraph.
+A SUPERVISOR agent reasons about the work and delegates each sub-task to the
+specialist sub-agent it needs (Research, Summarization, Analysis, Coding),
+looping until done, then synthesizes a report. Built as a stateful LangGraph.
 
 Flow:
     START -> plan -> supervisor --(routes to)--> research / analyze / code
                          ^                              |
-                         |______________________________|   (workers return to supervisor)
+                         |______________________________|   (workers return)
     supervisor --(when done)--> synthesize -> END
-
-The supervisor decides routing using the LLM (the "reasoning" of ReAct); the
-chosen sub-agent is then invoked in code, which keeps the system reliable on
-free-tier models while remaining faithful to the supervisor/ReAct pattern.
 """
 
 import re
@@ -34,7 +27,9 @@ from agents.specialists import (
     run_coding_agent,
 )
 
-MAX_STEPS = 14   # safety bound so the ReAct loop can never run forever
+MAX_STEPS = 12          # safety bound so the ReAct loop can never run forever
+MAX_TASKS = 3           # fewer sub-tasks = fewer model calls = faster runs
+MAX_SECTIONS = 4        # cap on synthesized report sections
 
 
 def _user_query(state: AgentState) -> str:
@@ -64,10 +59,10 @@ def _mark_first_pending_done(todos, instruction):
 
 # ====================== 1) PLAN NODE ======================
 def plan_node(state: AgentState) -> dict:
-    """Decompose the request into 3-5 tracked sub-tasks (write_todos pattern)."""
+    """Decompose the request into 3 tracked sub-tasks (write_todos pattern)."""
     query = _user_query(state)
     prompt = (
-        "Break the following request into 3 to 5 clear, focused sub-tasks. "
+        f"Break the following request into exactly 3 clear, focused sub-tasks. "
         "Return ONE sub-task per line, no numbering, no bullets.\n\n"
         f"Request: {query}"
     )
@@ -77,7 +72,7 @@ def plan_node(state: AgentState) -> dict:
         c = re.sub(r"^\s*\d+[.)]\s*", "", ln).strip("-*• \t")
         if c and len(c) > 5 and not c.endswith(":"):
             tasks.append(c)
-    tasks = tasks[:5] or [query]
+    tasks = tasks[:MAX_TASKS] or [query]
     todos = [{"content": t, "status": "pending"} for t in tasks]
     plan_text = "Plan:\n" + "\n".join(f"  - {t}" for t in tasks)
     print(f"[PLAN] {len(tasks)} sub-tasks created")
@@ -97,7 +92,7 @@ def plan_node(state: AgentState) -> dict:
 SUPERVISOR_PROMPT = """You are the SUPERVISOR. You do NOT do the work yourself. You assign the NEXT pending sub-task to the single most appropriate specialist sub-agent.
 
 Specialists:
-- research : finds factual information from the web (use for fact-finding, gathering, exploring a topic)
+- research : finds factual information from the web (fact-finding, gathering, exploring a topic)
 - analyze  : interprets, compares, or evaluates information that has already been gathered
 - code     : writes, implements, or explains code in a programming language
 
@@ -107,15 +102,17 @@ All current sub-tasks and their status:
 The NEXT pending sub-task to assign is:
 "{task}"
 
-Choose the ONE specialist that this specific sub-task needs. Do not pick an agent the task does not require. Respond EXACTLY in this format and nothing else:
+Choose the ONE specialist that this specific sub-task needs. Respond EXACTLY in this format and nothing else:
 AGENT: <research|analyze|code>"""
 
 
 def _classify(task: str) -> str:
-    """Keyword fallback so routing is reliable even if the model's reply is unclear."""
+    """Fast keyword router — no API call. Used first; the LLM is only a backup."""
     t = task.lower()
-    if any(k in t for k in ("write code", "implement", "function", "script", "program",
-                            "python code", "code for", "coding", "debug", "snippet")):
+    if any(k in t for k in ("write code", "write a function", "write a python",
+                            "python function", "python script", "code for",
+                            "implement a function", "implement an algorithm",
+                            "write a program", "coding", "debug", "code snippet")):
         return "code"
     if any(k in t for k in ("analyze", "analyse", "compare", "evaluate", "assess",
                             "interpret", "implication", "trade-off", "tradeoff",
@@ -125,7 +122,13 @@ def _classify(task: str) -> str:
 
 
 def supervisor_node(state: AgentState) -> dict:
-    """Assign the next pending sub-task to the specific specialist it needs."""
+    """Assign the next pending sub-task to the specialist it needs.
+
+    Hybrid routing: the free keyword classifier decides first; the LLM is only
+    consulted when the keyword guess is the default ('research'), so a plainly
+    worded analyze/code task isn't missed. This removes most supervisor LLM
+    calls and makes runs much faster while keeping LLM-reasoned routing.
+    """
     step = state.get("step_count", 0) + 1
     todos = [dict(t) for t in state.get("todos", [])]
     pending = [t for t in todos if t["status"] == "pending"]
@@ -141,14 +144,19 @@ def supervisor_node(state: AgentState) -> dict:
         return {"next_agent": "synthesize", "task_instruction": "", "step_count": step}
 
     task = pending[0]["content"]
-    todo_str = "\n".join(f"  - [{t['status']}] {t['content']}" for t in todos)
-    prompt = SUPERVISOR_PROMPT.format(todos=todo_str, task=task)
-    decision = message_text(invoke_llm(prompt, temperature=0).content)
-    agent = (_parse(decision, "AGENT") or "").lower().strip()
+    agent = _classify(task)                         # fast, no API call
 
-    # robust fallback: classify by keywords if the model's choice is unclear
-    if agent not in ("research", "analyze", "code"):
-        agent = _classify(task)
+    # only ask the LLM when the keyword guess is the generic default
+    if agent == "research":
+        todo_str = "\n".join(f"  - [{t['status']}] {t['content']}" for t in todos)
+        prompt = SUPERVISOR_PROMPT.format(todos=todo_str, task=task)
+        try:
+            decision = message_text(invoke_llm(prompt, temperature=0).content)
+            llm_agent = (_parse(decision, "AGENT") or "").lower().strip()
+            if llm_agent in ("research", "analyze", "code"):
+                agent = llm_agent
+        except Exception:
+            pass                                    # keep the keyword guess on error
 
     print(f"[SUPERVISOR] step {step}: '{task[:45]}' -> {agent}")
     return {"next_agent": agent, "task_instruction": task, "step_count": step}
@@ -228,32 +236,50 @@ def code_node(state: AgentState) -> dict:
     }
 
 
-# ====================== 4) SYNTHESIZE NODE (section-by-section) ======================
+# ====================== 4) SYNTHESIZE NODE (dynamic, section-by-section) ======================
 def synthesize_node(state: AgentState) -> dict:
     query = _user_query(state)
     notes = state.get("research_notes", "")
     if len(notes) > 7000:
         notes = notes[:7000] + "\n\n[Notes truncated for length.]"
-    print("[SYNTHESIZE] writing final report section-by-section...")
 
-    sections = [
-        ("Overview",
-         "Write ONLY the 'Overview' section (2-3 sentences). Do not write other sections."),
-        ("Key Findings",
-         "Write ONLY the 'Key Findings' section as 4-6 bullet points, each ending with a "
-         "source in parentheses. Do not write other sections."),
-        ("Analysis",
-         "Write ONLY the 'Analysis' section as 3-4 substantial paragraphs comparing evidence, "
-         "trade-offs, and implications. Do not write other sections."),
-        ("Conclusion",
-         "Write ONLY the 'Conclusion' section (2-3 sentences). Do not write other sections."),
-    ]
+    # 1) Let the model choose the sections that actually fit THIS query.
+    outline_prompt = (
+        f"You are planning the structure of a research report on: {query}\n\n"
+        f"Based on the research notes below, choose the {MAX_SECTIONS} section titles "
+        "that best fit THIS specific topic. Always start with 'Overview' and end with "
+        "'Conclusion'. Choose middle sections that genuinely suit the query (e.g. "
+        "'Key Findings', 'Comparison', 'Benefits', 'Risks & Challenges', 'Applications', "
+        "'Implementation', 'Future Outlook') — only include ones the notes support.\n\n"
+        "Return ONLY the section titles, one per line, no numbering or extra text.\n\n"
+        f"Notes:\n{notes[:3000]}"
+    )
+    try:
+        raw = message_text(invoke_llm(outline_prompt, temperature=0).content)
+        titles = [ln.strip("-*•0123456789. \t") for ln in raw.splitlines() if ln.strip()]
+        titles = [t for t in titles if len(t) > 2][:MAX_SECTIONS]
+    except Exception:
+        titles = []
+    if len(titles) < 2:
+        titles = ["Overview", "Key Findings", "Analysis", "Conclusion"]
+    if titles[0].lower() != "overview":
+        titles = ["Overview"] + titles
+    if titles[-1].lower() != "conclusion":
+        titles = titles + ["Conclusion"]
+    titles = titles[:MAX_SECTIONS + 1]              # hard cap
+
+    print(f"[SYNTHESIZE] sections chosen: {', '.join(titles)}")
+
+    # 2) Write each chosen section in its own call (keeps anti-truncation benefit).
     parts = []
-    for title, instruction in sections:
+    for title in titles:
         prompt = (
             f"You are writing a research report on: {query}\n\n"
-            f"Research notes:\n{notes}\n\n{instruction}\n"
-            "Do not repeat the section heading; write only the body text."
+            f"Research notes:\n{notes}\n\n"
+            f"Write ONLY the '{title}' section. Use the notes and cite sources where "
+            f"relevant. If the section calls for points, use 4-6 bullets; if it calls "
+            f"for discussion, use 2-4 paragraphs. Write only the body text — do not "
+            f"repeat the heading and do not write any other section."
         )
         try:
             body = message_text(invoke_llm(prompt, temperature=0).content).strip()
@@ -262,7 +288,7 @@ def synthesize_node(state: AgentState) -> dict:
         parts.append(f"## {title}\n\n{body}")
 
     final_report = f"# Research Report: {query}\n\n" + "\n\n".join(parts)
-    print(f"[SYNTHESIZE] done ({len(final_report)} chars)")
+    print(f"[SYNTHESIZE] done ({len(final_report)} chars, {len(titles)} sections)")
     return {
         "final_report": final_report,
         "messages": [AIMessage(content="Final report synthesized.")],

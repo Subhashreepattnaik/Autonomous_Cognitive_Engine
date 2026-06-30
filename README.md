@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.x-orange)
 ![LangChain](https://img.shields.io/badge/LangChain-1.x-1c3c3c)
-![LLM](https://img.shields.io/badge/LLM-Groq%20gpt--oss--120b-f55036)
+![LLM](https://img.shields.io/badge/LLM-Groq%20llama--3.3--70b-f55036)
 ![UI](https://img.shields.io/badge/UI-Streamlit-ff4b4b)
 ![Tracing](https://img.shields.io/badge/Tracing-LangSmith-purple)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -38,7 +38,7 @@ Give it a request like *"Research the main risks and benefits of solar energy"* 
 - **Stateful LangGraph workflow** — a `StateGraph` over a shared `AgentState`; the supervisor routes each task via a conditional edge, workers return to the supervisor (the ReAct loop), and a step bound guarantees termination.
 - **Section-by-section report synthesis** — `synthesize_node` composes the final report one section at a time (Overview, Key Findings, Analysis, Conclusion), so each section gets a full output budget and the report never truncates before its conclusion.
 - **Live quality scoring** — an LLM-as-a-judge scores each finished report 0–10 and shows a colored **Quality Score** badge in the UI.
-- **Automatic model failover** — every model call routes through a single access point that automatically fails over `gpt-oss-120b → gpt-oss-20b → llama-3.3-70b-versatile` on a rate-limit (429) error, so a single exhausted quota doesn't stop a run.
+- **Automatic model failover** — every model call routes through a single access point that automatically fails over `llama-3.3-70b-versatile → gemini-2.0-flash → gpt-oss-120b` on a rate-limit (429) error, so a single exhausted quota doesn't stop a run.
 - **PDF export** — `pdf_service` builds a downloadable PDF with a cover page, styled headings, **real rendered tables**, clickable links, and page numbers (ReportLab, generated in memory).
 - **Polished Streamlit UI** — gradient hero, example prompts, live execution dashboard (progress bar, current-task banner, color-coded task board), tabbed results (Report / Memory / Plan), run metrics, quality badge, PDF download, and reset.
 - **Automated evaluation suite** — an offline harness that scores the engine against four milestone metrics, including an LLM-as-a-judge for report quality (see [Evaluation](#evaluation)).
@@ -75,7 +75,7 @@ graph TD
     State --> UI
     UI --> PDF["PDF Export"]
 
-    Sup --> LLM["get_llm() / invoke_llm()<br/>Groq + auto-failover (rate-limited)"]
+    Sup --> LLM["get_llm() / invoke_llm()<br/>llama-3.3-70b + auto-failover (rate-limited)"]
     Research --> LLM
     Analyze --> LLM
     Code --> LLM
@@ -187,9 +187,9 @@ Autonomous_Cognitive_Engine/
 | Language              | Python 3.11+                                         |
 | Orchestration         | LangGraph (>= 1.0) — `StateGraph`                    |
 | Agent framework       | LangChain (>= 1.0) — `create_agent`, tools           |
-| LLM provider (main)   | Groq — `openai/gpt-oss-120b`                         |
-| LLM failover chain    | `gpt-oss-120b` → `gpt-oss-20b` → `llama-3.3-70b-versatile` |
-| LLM provider (alt)    | Google Gemini (`langchain-google-genai` >= 4.0)      |
+| LLM provider (main)   | Groq — `llama-3.3-70b-versatile`                     |
+| LLM failover chain    | `llama-3.3-70b-versatile` → `gemini-2.0-flash` → `gpt-oss-120b` |
+| Failover providers    | Google Gemini + Groq (`langchain-google-genai`)      |
 | Web search            | Tavily (`langchain-tavily`)                          |
 | Observability         | LangSmith                                            |
 | Rate limiting         | `langchain-core` `InMemoryRateLimiter`               |
@@ -199,7 +199,7 @@ Autonomous_Cognitive_Engine/
 
 ### Model strategy & automatic failover
 
-The default model is **`openai/gpt-oss-120b`** — on Groq's free tier it has the best quality and the largest daily token budget (~200K tokens/day). Because Groq tracks limits **separately per model**, all model access flows through a single chokepoint (`get_llm()` / `invoke_llm()`) that implements **automatic failover**: when a call hits a rate-limit (429) or daily-quota error, the engine transparently advances to the next model in the chain — `gpt-oss-120b → gpt-oss-20b → llama-3.3-70b-versatile` — and continues the run instead of failing. The fallback models each draw on a separate quota bucket, so an exhausted main model no longer stops a run. `gpt-oss-120b` remains the committed default; failover is runtime resilience underneath it.
+The default model is **`llama-3.3-70b-versatile`** on Groq — it is fast (Groq's LPU hardware), produces strong, well-structured writing for the report, and is **not a reasoning model**, so it has no hidden 'thinking' step that would slow runs or truncate long reports. All model access flows through a single chokepoint (`get_llm()` / `invoke_llm()`) that implements **automatic failover**: when a call hits a rate-limit (429) or quota error, the engine transparently advances to the next model in the chain — `llama-3.3-70b-versatile → gemini-2.0-flash → gpt-oss-120b` — and continues the run instead of failing. Each fallback draws on a separate quota bucket (a different Groq model and a different provider), so an exhausted main model no longer stops a run.
 
 ---
 
@@ -233,7 +233,7 @@ Configured in `.env` (loaded by `config/settings.py` via python-dotenv). See `.e
 |----------------------|----------|-----------------------------------------------------------|
 | `GROQ_API_KEY`       | Yes*     | Groq LLM access (all models in the failover chain)        |
 | `TAVILY_API_KEY`     | Yes      | Tavily web search                                         |
-| `GOOGLE_API_KEY`     | Optional | Google Gemini (only if `LLM_PROVIDER` is set to `gemini`) |
+| `GOOGLE_API_KEY`     | Yes*     | Google Gemini (used in the failover chain)                |
 | `LANGSMITH_TRACING`  | Optional | Set to `true` to enable tracing                           |
 | `LANGSMITH_API_KEY`  | Optional | LangSmith authentication                                  |
 | `LANGSMITH_PROJECT`  | Optional | Project name traces are grouped under                     |
@@ -258,7 +258,7 @@ Open the printed URL (usually `http://localhost:8501`), then:
 4. Read the report under the **Report** tab (with its **Quality Score** badge), inspect saved notes under **Memory**, review the **Plan**.
 5. Click **Download PDF** to save the report.
 
-> **Free-tier note:** the LLM and search providers are rate-limited per minute and per day. A shared rate limiter paces requests automatically, and if a model's quota is exhausted mid-run, the engine fails over to the next model in the chain (`120b → 20b → 70b`) without manual intervention.
+> **Free-tier note:** the LLM and search providers are rate-limited per minute and per day. A shared rate limiter paces requests automatically, and if a model's quota is exhausted mid-run, the engine fails over to the next model in the chain (`llama-3.3-70b → gemini-2.0-flash → gpt-oss-120b`) without manual intervention.
 
 ---
 
@@ -281,7 +281,7 @@ python -m evaluation.run_eval
 | M3 | Delegation & Result Integration | ≥ 80% | **100%** ✅ |
 | M4 | Report Quality (LLM-as-a-judge) | ≥ 70% | Passes on completed runs; in-app live quality up to 8/10 |
 
-*(Measured on a 3-query dataset using the free `openai/gpt-oss-120b` model on Groq. Individual reports score "Good" (6–8/10) in the live app.)*
+*(Measured on a 3-query dataset on free-tier models. Individual reports score "Good" (6–8/10) in the live app.)*
 
 ### Analysis
 
